@@ -1,0 +1,18 @@
+apiVersion: lambda.services.k8s.aws/v1alpha1
+kind: Function
+metadata:
+  name: testfunc
+spec:
+  functionName: testfunc
+  code:
+    s3Bucket: ack-testing-lambda-98756
+    s3Key: lambda.zip
+  role: arn:aws:iam::771174509839:role/ack-lambda-controller-smoke-tests-function-role
+  runtime: python3.9
+  handler: main
+  description: function created by ACK lambda-controller e2e tests
+---
+  tagging:
+    tagSet:
+    - key: "kubecon"
+      value: "2021"
