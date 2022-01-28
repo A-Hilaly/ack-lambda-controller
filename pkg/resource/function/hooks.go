@@ -500,17 +500,19 @@ func (rm *resourceManager) setResourceAdditionalFields(
 	}
 	ko.Spec.ReservedConcurrentExecutions = getFunctionConcurrencyOutput.ReservedConcurrentExecutions
 
-	var getFunctionCodeSigningConfigOutput *svcsdk.GetFunctionCodeSigningConfigOutput
-	getFunctionCodeSigningConfigOutput, err = rm.sdkapi.GetFunctionCodeSigningConfigWithContext(
-		ctx,
-		&svcsdk.GetFunctionCodeSigningConfigInput{
-			FunctionName: ko.Spec.Name,
-		},
-	)
-	rm.metrics.RecordAPICall("GET", "GetFunctionCodeSigningConfig", err)
-	if err != nil {
-		return err
+	if ko.Spec.PackageType != nil && *ko.Spec.PackageType != "Image" {
+		var getFunctionCodeSigningConfigOutput *svcsdk.GetFunctionCodeSigningConfigOutput
+		getFunctionCodeSigningConfigOutput, err = rm.sdkapi.GetFunctionCodeSigningConfigWithContext(
+			ctx,
+			&svcsdk.GetFunctionCodeSigningConfigInput{
+				FunctionName: ko.Spec.Name,
+			},
+		)
+		rm.metrics.RecordAPICall("GET", "GetFunctionCodeSigningConfig", err)
+		if err != nil {
+			return err
+		}
+		ko.Spec.CodeSigningConfigARN = getFunctionCodeSigningConfigOutput.CodeSigningConfigArn
 	}
-	ko.Spec.CodeSigningConfigARN = getFunctionCodeSigningConfigOutput.CodeSigningConfigArn
 	return nil
 }
