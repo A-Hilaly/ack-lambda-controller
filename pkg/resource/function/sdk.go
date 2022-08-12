@@ -1035,7 +1035,7 @@ func (rm *resourceManager) terminalAWSError(err error) bool {
 		return false
 	}
 	switch awsErr.Code() {
-	case "InvalidParameterValueException":
+	case "ValidationException":
 		return true
 	default:
 		return false

@@ -39,7 +39,7 @@ resources:
             FunctionName: Name
     exceptions:
       terminal_codes:
-        - InvalidParameterValueException
+        - ValidationException
     hooks:
       delta_pre_compare:
         code: customPreCompare(delta, a, b)
@@ -62,12 +62,18 @@ resources:
         is_required: true
     tags:
       ignore: true
+    exceptions:
+      terminal_codes:
+      - ValidationException
   CodeSigningConfig:
     fields:
       AllowedPublishers:
         is_required: true
     tags:
       ignore: true
+    exceptions:
+      terminal_codes:
+      - ValidationException
   EventSourceMapping:
     fields:
       UUID:
@@ -76,3 +82,6 @@ resources:
         is_required: true
     tags:
       ignore: true
+    exceptions:
+      terminal_codes:
+      - ValidationException

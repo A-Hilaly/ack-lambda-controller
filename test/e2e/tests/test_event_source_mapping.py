@@ -208,3 +208,51 @@ class TestEventSourceMapping:
 
         # Check ESM doesn't exist
         assert not lambda_validator.event_source_mapping_exists(esm_uuid)
+
+    def test_terminal_condition_invalid_parameter_value(self, lambda_client, lambda_function):
+        resource_name = random_suffix_name("lambda-esm", 24)
+
+        replacements = REPLACEMENT_VALUES.copy()
+        replacements["AWS_REGION"] = get_region()
+        replacements["EVENT_SOURCE_MAPPING_NAME"] = resource_name
+        replacements["BATCH_SIZE"] = "999999999"
+
+        # Load ESM CR
+        resource_data = load_lambda_resource(
+            "event_source_mapping_sqs",
+            additional_replacements=replacements,
+        )
+        logging.debug(resource_data)
+
+        # Create k8s resource
+        ref = k8s.CustomResourceReference(
+            CRD_GROUP, CRD_VERSION, RESOURCE_PLURAL,
+            resource_name, namespace="default",
+        )
+        k8s.create_custom_resource(ref, resource_data)
+        cr = k8s.wait_resource_consumed_by_controller(ref)
+
+        assert cr is not None
+        assert k8s.get_resource_exists(ref)
+
+        time.sleep(CREATE_WAIT_AFTER_SECONDS)
+
+        esm_uuid = cr['status']['uuid']
+
+        lambda_validator = LambdaValidator(lambda_client)
+        # Check ESM exists
+        assert not lambda_validator.event_source_mapping_exists(esm_uuid)
+
+        # assert condition
+        terminal_condition = k8s.get_resource_condition(ref, "ACK.Terminal")
+        assert terminal_condition is not None
+        assert "ValidationException" in terminal_condition["message"]
+
+        # Delete k8s resource
+        _, deleted = k8s.delete_custom_resource(ref)
+        assert deleted
+
+        time.sleep(DELETE_WAIT_AFTER_SECONDS)
+
+        # Check ESM doesn't exist
+        assert not lambda_validator.event_source_mapping_exists(esm_uuid)

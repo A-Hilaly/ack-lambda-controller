@@ -136,3 +136,55 @@ class TestAlias:
 
         # Check alias doesn't exist
         assert not lambda_validator.alias_exists(resource_name, lambda_function_name)
+
+    def test_terminal_condition_invalid_parameter_value(self, lambda_client, lambda_function):
+        (_, function_resource) = lambda_function
+        lambda_function_name = function_resource["spec"]["name"]
+
+        resource_name = random_suffix_name("lambda-alias", 150)
+
+        replacements = REPLACEMENT_VALUES.copy()
+        replacements["AWS_REGION"] = get_region()
+        replacements["ALIAS_NAME"] = resource_name
+        replacements["FUNCTION_NAME"] = lambda_function_name
+        replacements["FUNCTION_VERSION"] = "$LATEST"
+
+        # Load alias CR
+        resource_data = load_lambda_resource(
+            "alias",
+            additional_replacements=replacements,
+        )
+        logging.debug(resource_data)
+
+        # Create k8s resource
+        ref = k8s.CustomResourceReference(
+            CRD_GROUP, CRD_VERSION, RESOURCE_PLURAL,
+            resource_name, namespace="default",
+        )
+        k8s.create_custom_resource(ref, resource_data)
+        cr = k8s.wait_resource_consumed_by_controller(ref)
+
+        assert cr is not None
+        assert k8s.get_resource_exists(ref)
+
+        time.sleep(CREATE_WAIT_AFTER_SECONDS)
+
+        lambda_validator = LambdaValidator(lambda_client)
+        # Check alias exists
+        assert not lambda_validator.alias_exists(resource_name, lambda_function_name)
+
+        cr = k8s.wait_resource_consumed_by_controller(ref)
+        
+        # assert condition
+        terminal_condition = k8s.get_resource_condition(ref, "ACK.Terminal")
+        assert terminal_condition is not None
+        assert "ValidationException" in terminal_condition["message"]
+        
+        # Delete k8s resource
+        _, deleted = k8s.delete_custom_resource(ref)
+        assert deleted
+
+        time.sleep(DELETE_WAIT_AFTER_SECONDS)
+
+        # Check alias doesn't exist
+        assert not lambda_validator.alias_exists(resource_name, lambda_function_name)
