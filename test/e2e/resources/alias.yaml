@@ -1,11 +1,11 @@
 apiVersion: lambda.services.k8s.aws/v1alpha1
 kind: Alias
 metadata:
-  name: my-alias
+  name: $ALIAS_NAME
   annotations:
-    services.k8s.aws/region: us-west-2
+    services.k8s.aws/region: $AWS_REGION
 spec:
-  name: myalaisname
-  functionName: demo-function-list-items
-  functionVersion: $LATEST
-  description: myalias
+  name: $ALIAS_NAME
+  functionName: $FUNCTION_NAME
+  functionVersion: $FUNCTION_VERSION
+  description: alias created by ACK lambda-controller e2e tests

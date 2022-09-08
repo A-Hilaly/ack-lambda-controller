@@ -5,6 +5,9 @@ metadata:
   annotations:
     services.k8s.aws/region: $AWS_REGION
 spec:
-  name: $ALIAS_NAME 
+  name: $ALIAS_NAME
+  functionRef:
+    from:
+      name: $FUNCTION_REF_NAME
   functionVersion: $FUNCTION_VERSION
   description: alias created by ACK lambda-controller e2e tests
