@@ -227,6 +227,11 @@ func (in *AliasSpec) DeepCopyInto(out *AliasSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.FunctionRef != nil {
+		in, out := &in.FunctionRef, &out.FunctionRef
+		*out = new(corev1alpha1.AWSResourceReferenceWrapper)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.FunctionVersion != nil {
 		in, out := &in.FunctionVersion, &out.FunctionVersion
 		*out = new(string)

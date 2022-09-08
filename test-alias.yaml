@@ -6,6 +6,8 @@ metadata:
     services.k8s.aws/region: us-west-2
 spec:
   name: myalaisname
-  functionName: demo-function-list-items
+  functionRef:
+    from:
+      name: demo-function-list-items
   functionVersion: $LATEST
   description: myalias
