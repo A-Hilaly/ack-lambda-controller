@@ -15,7 +15,9 @@ package function
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
@@ -96,17 +98,18 @@ func (rm *resourceManager) customUpdateFunction(
 	// UpdateFunctionCode because both of them can put the function in a
 	// Pending state.
 	switch {
-	case delta.DifferentAt("Spec.Code"):
-		err = rm.updateFunctionCode(ctx, desired, delta)
-		if err != nil {
-			return nil, err
-		}
 	case delta.DifferentExcept(
 		"Spec.Code",
 		"Spec.Tags",
 		"Spec.ReservedConcurrentExecutions",
-		"Spec.CodeSigningConfigARN"):
+		"Spec.CodeSigningConfigARN",
+		"Spec.CodeS3SHA256"):
 		err = rm.updateFunctionConfiguration(ctx, desired, delta)
+		if err != nil {
+			return nil, err
+		}
+	case delta.DifferentAt("Spec.Code") || delta.DifferentAt("Spec.CodeS3SHA256"):
+		err = rm.updateFunctionCode(ctx, desired, delta)
 		if err != nil {
 			return nil, err
 		}
@@ -335,30 +338,26 @@ func (rm *resourceManager) updateFunctionCode(
 	exit := rlog.Trace("rm.updateFunctionCode")
 	defer exit(err)
 
-	if delta.DifferentAt("Spec.Code.S3Key") &&
-		!delta.DifferentAt("Spec.Code.S3Bucket") &&
-		!delta.DifferentAt("Spec.Code.S3ObjectVersion") &&
-		!delta.DifferentAt("Spec.Code.ImageURI") {
-		log := ackrtlog.FromContext(ctx)
-		log.Info("updating code.s3Key field is not currently supported.")
-		return nil
-	}
-
 	dspec := desired.ko.Spec
 	input := &svcsdk.UpdateFunctionCodeInput{
 		FunctionName: aws.String(*dspec.Name),
 	}
 
 	if dspec.Code != nil {
-		switch {
-		case dspec.Code.ImageURI != nil:
-			input.ImageUri = dspec.Code.ImageURI
-		case dspec.Code.S3Bucket != nil,
-			dspec.Code.S3Key != nil,
-			dspec.Code.S3ObjectVersion != nil:
-			input.S3Bucket = dspec.Code.S3Bucket
-			input.S3Key = dspec.Code.S3Key
-			input.S3ObjectVersion = dspec.Code.S3ObjectVersion
+		if delta.DifferentAt("Spec.Code.ImageURI") {
+			if dspec.Code.ImageURI != nil {
+				input.ImageUri = dspec.Code.ImageURI
+			}
+		} else if delta.DifferentAt("Spec.CodeS3SHA256") {
+			if dspec.Code.S3Key != nil {
+				input.S3Key = aws.String(*dspec.Code.S3Key)
+			}
+			if dspec.Code.S3Bucket != nil {
+				input.S3Bucket = aws.String(*dspec.Code.S3Bucket)
+			}
+			if dspec.Code.S3ObjectVersion != nil {
+				input.S3ObjectVersion = aws.String(*dspec.Code.S3ObjectVersion)
+			}
 		}
 	}
 
@@ -414,6 +413,19 @@ func customPreCompare(
 		} else if a.ko.Spec.Code.ImageURI != nil && b.ko.Spec.Code.ImageURI != nil {
 			if *a.ko.Spec.Code.ImageURI != *b.ko.Spec.Code.ImageURI {
 				delta.Add("Spec.Code.ImageURI", a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI)
+			}
+		}
+		expected, _ := json.Marshal(a.ko.Spec.CodeS3SHA256)
+		fmt.Println("expected:", string(expected))
+
+		actual, _ := json.Marshal(b.ko.Status.CodeSHA256)
+		fmt.Println("actual:", string(actual))
+
+		if ackcompare.HasNilDifference(a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256) {
+			delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
+		} else if a.ko.Spec.CodeS3SHA256 != nil && b.ko.Status.CodeSHA256 != nil {
+			if *a.ko.Spec.CodeS3SHA256 != *b.ko.Status.CodeSHA256 {
+				delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
 			}
 		}
 		//TODO(hialylmh) handle Spec.Code.S3bucket changes
