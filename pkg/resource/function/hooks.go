@@ -343,6 +343,22 @@ func (rm *resourceManager) updateFunctionCode(
 		FunctionName: aws.String(*dspec.Name),
 	}
 
+	// CodeSHA256 can work with ImageURI and s3
+
+	// If a.Spec.CodeSHA256 == {
+	// 		check diff imageURI
+	// }
+	//
+	// If CodeSHA256 changes
+	// 		If imageURI exists => update with imageURI
+	//      		imageURI exists <=> spec.PackageType == "Image"
+	// 								<=> spec.Code != nil && spec.Code.ImageURI !=nil && *spec.Code.ImageURI != ""
+	// 		If PackageType == Zip && s3... exists => update with s3...
+	// 				=> modify the s3code
+	//
+	// if imageURI changed => update imageURI
+	// it is not possible to check s3 changes (for now...)
+
 	if dspec.Code != nil {
 		if delta.DifferentAt("Spec.Code.ImageURI") {
 			if dspec.Code.ImageURI != nil {
@@ -405,50 +421,69 @@ func customPreCompare(
 	a *resource,
 	b *resource,
 ) {
+
 	if ackcompare.HasNilDifference(a.ko.Spec.Code, b.ko.Spec.Code) {
 		delta.Add("Spec.Code", a.ko.Spec.Code, b.ko.Spec.Code)
 	} else if a.ko.Spec.Code != nil && b.ko.Spec.Code != nil {
-		if ackcompare.HasNilDifference(a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI) {
-			delta.Add("Spec.Code.ImageURI", a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI)
-		} else if a.ko.Spec.Code.ImageURI != nil && b.ko.Spec.Code.ImageURI != nil {
-			if *a.ko.Spec.Code.ImageURI != *b.ko.Spec.Code.ImageURI {
+
+		if a.ko.Spec.PackageType != nil && *a.ko.Spec.PackageType == "Image" {
+			if ackcompare.HasNilDifference(a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI) {
 				delta.Add("Spec.Code.ImageURI", a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI)
+			} else if a.ko.Spec.Code.ImageURI != nil && b.ko.Spec.Code.ImageURI != nil {
+				if *a.ko.Spec.Code.ImageURI != *b.ko.Spec.Code.ImageURI {
+					delta.Add("Spec.Code.ImageURI", a.ko.Spec.Code.ImageURI, b.ko.Spec.Code.ImageURI)
+				}
 			}
-		}
-		expected, _ := json.Marshal(a.ko.Spec.CodeS3SHA256)
-		fmt.Println("expected:", string(expected))
+			if a.ko.Spec.CodeS3SHA256 != nil {
+				if ackcompare.HasNilDifference(a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256) {
+					delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
+				} else if a.ko.Spec.CodeS3SHA256 != nil && b.ko.Status.CodeSHA256 != nil {
+					if *a.ko.Spec.CodeS3SHA256 != *b.ko.Status.CodeSHA256 {
+						delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
+					}
+				}
+			}
+		} else {
+			if a.ko.Spec.CodeS3SHA256 != nil {
+				if ackcompare.HasNilDifference(a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256) {
+					delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
+				} else if a.ko.Spec.CodeS3SHA256 != nil && b.ko.Status.CodeSHA256 != nil {
+					if *a.ko.Spec.CodeS3SHA256 != *b.ko.Status.CodeSHA256 {
+						delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
+					}
+				}
+			}
 
-		actual, _ := json.Marshal(b.ko.Status.CodeSHA256)
-		fmt.Println("actual:", string(actual))
+			expected, _ := json.Marshal(a.ko.Spec.CodeS3SHA256)
+			fmt.Println("expected:", string(expected))
 
-		if ackcompare.HasNilDifference(a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256) {
-			delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
-		} else if a.ko.Spec.CodeS3SHA256 != nil && b.ko.Status.CodeSHA256 != nil {
-			if *a.ko.Spec.CodeS3SHA256 != *b.ko.Status.CodeSHA256 {
-				delta.Add("Spec.CodeS3SHA256", a.ko.Spec.CodeS3SHA256, b.ko.Status.CodeSHA256)
-			}
-		}
-		//TODO(hialylmh) handle Spec.Code.S3bucket changes
-		//  if ackcompare.HasNilDifference(a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket) {
-		//  	delta.Add("Spec.Code.S3Bucket", a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket)
-		//  } else if a.ko.Spec.Code.S3Bucket != nil && b.ko.Spec.Code.S3Bucket != nil {
-		//  	if *a.ko.Spec.Code.S3Bucket != *b.ko.Spec.Code.S3Bucket {
-		//  		delta.Add("Spec.Code.S3Bucket", a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket)
-		//  	}
-		//  }
-		if ackcompare.HasNilDifference(a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key) {
-			delta.Add("Spec.Code.S3Key", a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key)
-		} else if a.ko.Spec.Code.S3Key != nil && b.ko.Spec.Code.S3Key != nil {
-			if *a.ko.Spec.Code.S3Key != *b.ko.Spec.Code.S3Key {
-				delta.Add("Spec.Code.S3Key", a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key)
-			}
-		}
-		if ackcompare.HasNilDifference(a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion) {
-			delta.Add("Spec.Code.S3ObjectVersion", a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion)
-		} else if a.ko.Spec.Code.S3ObjectVersion != nil && b.ko.Spec.Code.S3ObjectVersion != nil {
-			if *a.ko.Spec.Code.S3ObjectVersion != *b.ko.Spec.Code.S3ObjectVersion {
-				delta.Add("Spec.Code.S3ObjectVersion", a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion)
-			}
+			actual, _ := json.Marshal(b.ko.Status.CodeSHA256)
+			fmt.Println("actual:", string(actual))
+
+			// no need to compare s3 bucket/name/objectversion
+
+			//TODO(hialylmh) handle Spec.Code.S3bucket changes
+			//  if ackcompare.HasNilDifference(a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket) {
+			//  	delta.Add("Spec.Code.S3Bucket", a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket)
+			//  } else if a.ko.Spec.Code.S3Bucket != nil && b.ko.Spec.Code.S3Bucket != nil {
+			//  	if *a.ko.Spec.Code.S3Bucket != *b.ko.Spec.Code.S3Bucket {
+			//  		delta.Add("Spec.Code.S3Bucket", a.ko.Spec.Code.S3Bucket, b.ko.Spec.Code.S3Bucket)
+			//  	}
+			//  }
+			/* 			if ackcompare.HasNilDifference(a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key) {
+			   				delta.Add("Spec.Code.S3Key", a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key)
+			   			} else if a.ko.Spec.Code.S3Key != nil && b.ko.Spec.Code.S3Key != nil {
+			   				if *a.ko.Spec.Code.S3Key != *b.ko.Spec.Code.S3Key {
+			   					delta.Add("Spec.Code.S3Key", a.ko.Spec.Code.S3Key, b.ko.Spec.Code.S3Key)
+			   				}
+			   			}
+			   			if ackcompare.HasNilDifference(a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion) {
+			   				delta.Add("Spec.Code.S3ObjectVersion", a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion)
+			   			} else if a.ko.Spec.Code.S3ObjectVersion != nil && b.ko.Spec.Code.S3ObjectVersion != nil {
+			   				if *a.ko.Spec.Code.S3ObjectVersion != *b.ko.Spec.Code.S3ObjectVersion {
+			   					delta.Add("Spec.Code.S3ObjectVersion", a.ko.Spec.Code.S3ObjectVersion, b.ko.Spec.Code.S3ObjectVersion)
+			   				}
+			   			} */
 		}
 	}
 }

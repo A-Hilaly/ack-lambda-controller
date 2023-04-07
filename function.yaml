@@ -1,0 +1,13 @@
+apiVersion: lambda.services.k8s.aws/v1alpha1
+kind: Function
+metadata:
+  name: ack-img-function
+  annotations:
+    services.k8s.aws/region: eu-west-2
+spec:
+  name: ack-img-function
+  packageType: Image
+  code:
+    imageURI: 771174509839.dkr.ecr.eu-west-2.amazonaws.com/test2:latest
+  role: arn:aws:iam::771174509839:role/ack-lambda-test-role
+  description: a lambda function create with an image URI

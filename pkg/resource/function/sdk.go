@@ -56,6 +56,10 @@ func (rm *resourceManager) sdkFind(
 	ctx context.Context,
 	r *resource,
 ) (latest *resource, err error) {
+	// user provide r *resource
+	// user s3 code and user s3 bucketname
+
+
 	rlog := ackrtlog.FromContext(ctx)
 	exit := rlog.Trace("rm.sdkFind")
 	defer func() {
@@ -88,6 +92,9 @@ func (rm *resourceManager) sdkFind(
 
 	// Merge in the information we read from the API call above to the copy of
 	// the original Kubernetes object we passed to the function
+
+	// ko is the copy of R
+	// we have also code user s3 code and user s3 bucketname
 	ko := r.ko.DeepCopy()
 
 	if resp.Tags != nil {
@@ -116,6 +123,8 @@ func (rm *resourceManager) sdkFind(
 		if resp.Code.ImageUri != nil {
 			ko.Spec.Code.ImageURI = resp.Code.ImageUri
 		}
+
+		// s3 code and s3 bucket and object version they are still equal to "r"
 	}
 	if resp.Configuration.CodeSha256 != nil {
 		ko.Status.CodeSHA256 = resp.Configuration.CodeSha256
@@ -136,11 +145,17 @@ func (rm *resourceManager) sdkFind(
 	} else {
 		ko.Spec.DeadLetterConfig = nil
 	}
+	// r.Description == "My function"
+
+
 	if resp.Configuration.Description != nil {
+		// API said that description is "My function 2"
 		ko.Spec.Description = resp.Configuration.Description
 	} else {
 		ko.Spec.Description = nil
 	}
+	// ko.Description and r.Description
+
 	if resp.Configuration.Environment != nil {
 		f4 := &svcapitypes.Environment{}
 		if resp.Configuration.Environment.Variables != nil {
